@@ -8,9 +8,9 @@ from langchain_cohere import ChatCohere
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langgraph.graph import StateGraph, MessagesState, START, END
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, BaseMessage
 # from typing_extensions import TypedDict
-from weather_api_connect import get_weather_for_timestamps
+from weather_api_connect import get_weather_for_timestamps, WeatherData
 from datetime import datetime
 
 
@@ -20,8 +20,10 @@ COHERE_KEY = os.getenv("COHERE_KEY")
 # Custom State
 class AgentState(TypedDict):
     # messages: List[AIMessage | HumanMessage | SystemMessage]
-    messages: List[str]
+    # messages: List[str]
+    messages: List[BaseMessage]
     topic: Optional[str]
+    weather_data: Optional[List[WeatherData]]
 
 # This function will handle the first message from the user
 def first_message(state: AgentState) -> AgentState:
@@ -202,8 +204,10 @@ def get_weather_from_api(state: AgentState) -> AgentState:
     print("The timestamps are: " + str(timestamps))
     weather_data = get_weather_for_timestamps(timestamps)
     print("The weather data is: " + str(weather_data))
-    new_messages = state["messages"] + [SystemMessage(content=str(weather_data))]
-    new_state = AgentState(messages=new_messages, topic=state["topic"])
+    # new_messages = state["messages"] + [SystemMessage(content=str(weather_data))]
+    new_messages = state["messages"]
+    new_state = AgentState(messages=new_messages, topic=state["topic"], weather_data=weather_data)
+    print(new_state)
     return new_state
     # return {"messages": state["messages"] + [{"role": "system", "content": str(weather_data)}]}
 
@@ -213,7 +217,8 @@ class WeatherExplainerResponse(BaseModel):
 def weather_explainer_chatbot(state: AgentState) -> AgentState:
     print("Weather explainer chatbot called")
     # We need the lasts function weather data added to the messages
-    last_message = get_last_system_message(state)
+    # last_message = get_last_system_message(state)
+    weather_data = state["weather_data"]
     # last_message = state["messages"][-1].content
     llm = ChatCohere(
         cohere_api_key=COHERE_KEY,
@@ -242,11 +247,11 @@ def weather_explainer_chatbot(state: AgentState) -> AgentState:
     chain = prompt | llm | parser
     
     response = chain.invoke({
-        "query": last_message
+        "query": weather_data
     })
     print("The models explanation for the weather is: " + response.explanation)
     new_messages = state["messages"] + [AIMessage(content=response.explanation)]
-    new_state = AgentState(messages=new_messages, topic=state["topic"])
+    new_state = AgentState(messages=new_messages, topic=state["topic"], weather_data=state["weather_data"])
     return new_state
     # return {"messages": state["messages"] + [{"role": "ai", "content": response.explanation}]}
 
@@ -268,6 +273,13 @@ def chatbot_with_context(state: AgentState) -> AgentState:
     )
 
     # We use all history
+    # Maybe pass only the messages content
+    # This is good, but the AI copies the format and it breaks.
+    # messages = []
+    # for msg in state["messages"]:
+    #     short_msg = f"{msg.type}: {msg.content}"
+    #     messages += [short_msg]
+    # print("The messages that will be used as context for the chatbot are: " + str(messages))
     messages = state["messages"]
 
     prompt = ChatPromptTemplate.from_messages(
@@ -277,7 +289,6 @@ def chatbot_with_context(state: AgentState) -> AgentState:
             You are a helpful assistant.
             Continue the conversation based on previous context.
             Just respond naturally.
-
             {format_instructions}
             """
             ),
@@ -292,7 +303,7 @@ def chatbot_with_context(state: AgentState) -> AgentState:
     })
 
     new_messages = state["messages"] + [AIMessage(content=response.answer)]
-    new_state = AgentState(messages=new_messages, topic=state["topic"])
+    new_state = AgentState(messages=new_messages, topic=state["topic"], weather_data=state["weather_data"])
     return new_state
     # return {
     #     "messages": state["messages"] + [
@@ -380,13 +391,15 @@ def main():
     while True:
         message = input("You: ")
 
+        if message.lower() in ["reset", "nuevo", "new"]:
+            state["topic"] = None
+            state["weather_data"] = None
+            state["messages"] = []
+            message = input("You (for new topic): ")
+        
         if message.lower() in ["exit", "quit"]:
             print("Exiting the chatbot. Goodbye!")
             break
-
-        if message.lower() in ["reset", "nuevo", "new"]:
-            state["topic"] = None
-            message = input("You (for new topic): ")
 
         # We add the user's message to the state
         state["messages"].append(HumanMessage(content=message))
@@ -400,8 +413,8 @@ def main():
         #     if msg.type == "ai":
         #         last_ai = msg.content
         #         break
-
-        # print("AI:", last_ai)
+        last_ai = get_last_ai_message(state)
+        print("AI:", str(last_ai))
 
 if __name__ == "__main__":
     main()

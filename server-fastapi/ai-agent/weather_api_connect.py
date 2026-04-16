@@ -3,7 +3,9 @@ import openmeteo_requests
 import pandas as pd
 import requests_cache
 from retry_requests import retry
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
+import json
 
 def get_weather_data() -> pd.DataFrame:
     # Setup the Open-Meteo API client with cache and retry on error
@@ -49,6 +51,25 @@ def get_weather_data() -> pd.DataFrame:
 
     return hourly_dataframe
 
+class WeatherData(BaseModel):
+    timestamp: str
+    temperature_2m: Optional[float]
+    precipitation_probability: Optional[float]
+
+def parse_weather_data(weather_data_str: str) -> List[WeatherData]:
+    # weather_data_str looks like
+    # [{'timestamp': '2026-04-16T15:00:00Z',
+    # 'temperature_2m': np.float32(24.958),
+    # 'precipitation_probability': np.float32(0.0)}]
+    weather_data_list = json.loads(weather_data_str)
+    parsed_data = []
+    for item in weather_data_list:
+        parsed_data.append(WeatherData(
+            timestamp=item['timestamp'],
+            temperature_2m=float(item['temperature_2m']),
+            precipitation_probability=float(item['precipitation_probability'])
+        ))
+    return parsed_data
 
 def get_weather_for_timestamps(timestamps: List[str]):
     # We need to parse the hourly_dataframe to get the weather for the given timestamps
@@ -57,10 +78,16 @@ def get_weather_for_timestamps(timestamps: List[str]):
     for timestamp in timestamps:
         weather = hourly_dataframe[hourly_dataframe['date'] == timestamp]
         if not weather.empty:
-            weather_data.append({
-                "timestamp": timestamp,
-                "temperature_2m": weather["temperature_2m"].values[0],
-                "precipitation_probability": weather["precipitation_probability"].values[0]
-            })
+            weather_data.append(WeatherData(
+                timestamp=timestamp,
+                temperature_2m=weather["temperature_2m"].values[0],
+                precipitation_probability=weather["precipitation_probability"].values[0]
+            ))
+            # weather_data.append({
+            #     "timestamp": timestamp,
+            #     "temperature_2m": weather["temperature_2m"].values[0],
+            #     "precipitation_probability": weather["precipitation_probability"].values[0]
+            # })
+
     return weather_data
 
