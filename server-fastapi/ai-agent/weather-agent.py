@@ -1,39 +1,49 @@
 import os
 import cohere
-from typing import List, Annotated, Literal
+from typing import List, Annotated, Literal, TypedDict, Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from langchain_cohere import ChatCohere
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langgraph.graph import StateGraph, MessagesState, START, END
-from typing_extensions import TypedDict
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+# from typing_extensions import TypedDict
 from weather_api_connect import get_weather_for_timestamps
 from datetime import datetime
+
+
 load_dotenv()
 COHERE_KEY = os.getenv("COHERE_KEY")
 
-
-
 # Custom State
-# No custom state, we only need messages
+class AgentState(TypedDict):
+    # messages: List[AIMessage | HumanMessage | SystemMessage]
+    messages: List[str]
+    topic: Optional[str]
 
 # This function will handle the first message from the user
-def first_message(state: MessagesState) -> MessagesState:
+def first_message(state: AgentState) -> AgentState:
     message = state["messages"][-1].content
     print("First message from user is: " + message)
     # We already add it to the state when in main
     # We leave it for future modifications
-    new_state = {"messages": state["messages"] + [{"role": "user", "content": message}]}
-    return new_state
+    # new_messages = state["messages"] + [HumanMessage(content=message)]
+    # new_state = AgentState(messages=new_messages, topic=None)
+    # new_state = {"messages": state["messages"] + [{"role": "user", "content": message}]}
+    return state
 
 class ClassifierResponse(BaseModel):
     topic: str
 
 # This function will classify the user's query as either "weather"
 # or "general knowledge"
-def classify_query(state: MessagesState) -> MessagesState:
-    last_message = state["messages"][-1].content
+def classify_query(state: AgentState) -> AgentState:
+    for msg in reversed(state["messages"]):
+        if msg.type == "human":
+            last_message = msg.content
+            break
+    # last_message = state["messages"][-1].content
     llm = ChatCohere(
         cohere_api_key=COHERE_KEY,
         model="command-a-03-2025"
@@ -67,14 +77,16 @@ def classify_query(state: MessagesState) -> MessagesState:
     })
 
     print("The query is classified as: " + response.topic)
-    return {"messages": state["messages"] + [{"role": "system", "content": response.topic}]}
+    new_topic = response.topic
+    new_state = AgentState(messages=state["messages"], topic=new_topic)
+    return new_state
 
-def router(state: MessagesState) -> Literal["weather", "general knowledge", "unknown topic"]:
-    last_message = state["messages"][-1].content
+def router(state: AgentState) -> Literal["weather", "general knowledge", "unknown topic"]:
+    message_topic = state["topic"]
 
-    if last_message == "weather":
+    if message_topic == "weather":
         return "weather"
-    elif last_message == "general knowledge":
+    elif message_topic == "general knowledge":
         return "general knowledge"
     else:
         return "unknown topic"
@@ -82,9 +94,13 @@ def router(state: MessagesState) -> Literal["weather", "general knowledge", "unk
 class TimeStampsResponse(BaseModel):
     timestamps: List[str]
 
-def initial_chatbot_for_weather(state: MessagesState) -> MessagesState:
+def initial_chatbot_for_weather(state: AgentState) -> AgentState:
     print("Initial chatbot for weather called")
-    last_message = str(state["messages"][-2].content)
+    for msg in reversed(state["messages"]):
+        if msg.type == "human":
+            last_message = msg.content
+            break
+    # last_message = str(state["messages"][-2].content)
     print("The last message that will be timestamped is: " + last_message)
     now = datetime.now().isoformat()
     print("The current date and time is: " + now)
@@ -126,14 +142,21 @@ def initial_chatbot_for_weather(state: MessagesState) -> MessagesState:
     print("Weather chatbot has responded.")
     # return {"messages": [{"role": "ai", "content": '["2026-04-09T15:00:00Z", "2026-04-15T15:00:00Z"]'}]}
     print("The identified timestamps are: " + str(response.timestamps))
-    return {"messages": state["messages"] + [{"role": "ai", "content": str(response.timestamps)}]}
+    new_messages = state["messages"] + [AIMessage(content=str(response.timestamps))]
+    new_state = AgentState(messages=new_messages, topic=state["topic"])
+    # return {"messages": state["messages"] + [{"role": "ai", "content": str(response.timestamps)}]}
+    return new_state
 
 class GeneralKnowledgeResponse(BaseModel):
     explanation: str
 
-def initial_chatbot_for_general_knowledge(state: MessagesState) -> MessagesState:
+def initial_chatbot_for_general_knowledge(state: AgentState) -> AgentState:
     print("Initial chatbot for general knowledge called")
-    last_message = state["messages"][-2].content
+    for msg in reversed(state["messages"]):
+        if msg.type == "human":
+            last_message = msg.content
+            break
+    # last_message = state["messages"][-2].content
     print("The last message that will be answered is: " + str(last_message))
     llm = ChatCohere(
         cohere_api_key=COHERE_KEY,
@@ -164,25 +187,39 @@ def initial_chatbot_for_general_knowledge(state: MessagesState) -> MessagesState
         "query": last_message
     })
     print("The models explanation for the general knowledge question is: " + response.explanation)
-    return {"messages": state["messages"] + [{"role": "ai", "content": response.explanation}]}
+    new_messages = state["messages"] + [AIMessage(content=response.explanation)]
+    new_state = AgentState(messages=new_messages, topic=state["topic"])
+    return new_state
+    # return {"messages": state["messages"] + [{"role": "ai", "content": response.explanation}]}
 
 
-def get_weather_from_api(state: MessagesState) -> MessagesState:
-    last_message = state["messages"][-1].content
+def get_weather_from_api(state: AgentState) -> AgentState:
+    for msg in reversed(state["messages"]):
+        if msg.type == "ai":
+            last_message = msg.content
+            break
+    # last_message = state["messages"][-1].content
     # eval("[algo]") == [algo]
     timestamps = eval(last_message)
     print("The timestamps are: " + str(timestamps))
     weather_data = get_weather_for_timestamps(timestamps)
     print("The weather data is: " + str(weather_data))
-    return {"messages": state["messages"] + [{"role": "system", "content": str(weather_data)}]}
+    new_messages = state["messages"] + [SystemMessage(content=str(weather_data))]
+    new_state = AgentState(messages=new_messages, topic=state["topic"])
+    return new_state
+    # return {"messages": state["messages"] + [{"role": "system", "content": str(weather_data)}]}
 
 class WeatherExplainerResponse(BaseModel):
     explanation: str
 
-def weather_explainer_chatbot(state: MessagesState) -> MessagesState:
+def weather_explainer_chatbot(state: AgentState) -> AgentState:
     print("Weather explainer chatbot called")
     # We need the lasts function weather data added to the messages
-    last_message = state["messages"][-1].content
+    for msg in reversed(state["messages"]):
+        if msg.type == "system":
+            last_message = msg.content
+            break
+    # last_message = state["messages"][-1].content
     llm = ChatCohere(
         cohere_api_key=COHERE_KEY,
         model="command-a-03-2025"
@@ -212,14 +249,17 @@ def weather_explainer_chatbot(state: MessagesState) -> MessagesState:
         "query": last_message
     })
     print("The models explanation for the weather is: " + response.explanation)
-    return {"messages": state["messages"] + [{"role": "ai", "content": response.explanation}]}
+    new_messages = state["messages"] + [AIMessage(content=response.explanation)]
+    new_state = AgentState(messages=new_messages, topic=state["topic"])
+    return new_state
+    # return {"messages": state["messages"] + [{"role": "ai", "content": response.explanation}]}
 
 
 
 class ChatResponse(BaseModel):
     answer: str
 
-def chatbot_with_context(state: MessagesState) -> MessagesState:
+def chatbot_with_context(state: AgentState) -> AgentState:
     print("Conversational chatbot called")
 
     llm = ChatCohere(
@@ -255,13 +295,16 @@ def chatbot_with_context(state: MessagesState) -> MessagesState:
         "messages": messages
     })
 
-    return {
-        "messages": state["messages"] + [
-            {"role": "ai", "content": response.answer}
-        ]
-    }
+    new_messages = state["messages"] + [AIMessage(content=response.answer)]
+    new_state = AgentState(messages=new_messages, topic=state["topic"])
+    return new_state
+    # return {
+    #     "messages": state["messages"] + [
+    #         {"role": "ai", "content": response.answer}
+    #     ]
+    # }
 
-def router_entry(state: MessagesState) -> Literal["new_query", "followup"]:
+def router_entry(state: AgentState) -> Literal["new_query", "followup"]:
     # If there is any previous AI message,
     # we consider this a followup, otherwise it's a new query
     for msg in reversed(state["messages"]):
@@ -271,7 +314,7 @@ def router_entry(state: MessagesState) -> Literal["new_query", "followup"]:
     return "new_query"
 
 def weather_agent():
-    graph = StateGraph(MessagesState)
+    graph = StateGraph(AgentState)
     graph.add_node("first_message", first_message)
     graph.add_node("classify_query", classify_query)
     graph.add_node("initial_chatbot_for_weather", initial_chatbot_for_weather)
@@ -317,13 +360,13 @@ def weather_agent():
 
 def main():
     graph = weather_agent()
-    state = {"messages": []}
+    state = AgentState(messages=[], topic=None)
 
     while True:
         message = input("You: ")
 
         # We add the user's message to the state
-        state["messages"].append({"role": "user", "content": message})
+        state["messages"].append(HumanMessage(content=message))
 
         # We execute the graph
         state = graph.invoke(state)
@@ -335,7 +378,7 @@ def main():
                 last_ai = msg.content
                 break
 
-        print("AI:", last_ai)
+        # print("AI:", last_ai)
 
 if __name__ == "__main__":
     main()
