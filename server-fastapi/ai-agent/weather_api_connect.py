@@ -5,7 +5,6 @@ import requests_cache
 from retry_requests import retry
 from typing import List, Dict, Any
 
-
 def get_weather_data() -> pd.DataFrame:
     # Setup the Open-Meteo API client with cache and retry on error
     cache_session = requests_cache.CachedSession('.cache', expire_after = 3600)

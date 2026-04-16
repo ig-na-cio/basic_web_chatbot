@@ -1,4 +1,5 @@
 import os
+import json
 import cohere
 from typing import List, Annotated, Literal, TypedDict, Optional
 from dotenv import load_dotenv
@@ -24,7 +25,8 @@ class AgentState(TypedDict):
 
 # This function will handle the first message from the user
 def first_message(state: AgentState) -> AgentState:
-    message = state["messages"][-1].content
+    message = get_last_human_message(state)
+    # message = state["messages"][-1].content
     print("First message from user is: " + message)
     # We already add it to the state when in main
     # We leave it for future modifications
@@ -39,10 +41,7 @@ class ClassifierResponse(BaseModel):
 # This function will classify the user's query as either "weather"
 # or "general knowledge"
 def classify_query(state: AgentState) -> AgentState:
-    for msg in reversed(state["messages"]):
-        if msg.type == "human":
-            last_message = msg.content
-            break
+    last_message = get_last_human_message(state)
     # last_message = state["messages"][-1].content
     llm = ChatCohere(
         cohere_api_key=COHERE_KEY,
@@ -96,10 +95,7 @@ class TimeStampsResponse(BaseModel):
 
 def initial_chatbot_for_weather(state: AgentState) -> AgentState:
     print("Initial chatbot for weather called")
-    for msg in reversed(state["messages"]):
-        if msg.type == "human":
-            last_message = msg.content
-            break
+    last_message = get_last_human_message(state)
     # last_message = str(state["messages"][-2].content)
     print("The last message that will be timestamped is: " + last_message)
     now = datetime.now().isoformat()
@@ -141,9 +137,16 @@ def initial_chatbot_for_weather(state: AgentState) -> AgentState:
     })
     print("Weather chatbot has responded.")
     # return {"messages": [{"role": "ai", "content": '["2026-04-09T15:00:00Z", "2026-04-15T15:00:00Z"]'}]}
-    print("The identified timestamps are: " + str(response.timestamps))
-    new_messages = state["messages"] + [AIMessage(content=str(response.timestamps))]
+    
+    # print("The identified timestamps are: " + str(response.timestamps))
+    # new_messages = state["messages"] + [AIMessage(content=str(response.timestamps))]
+    # new_state = AgentState(messages=new_messages, topic=state["topic"])
+    
+    timestamps = json.dumps(response.timestamps)
+    print("The identified timestamps are: " + str(timestamps))
+    new_messages = state["messages"] + [AIMessage(content=timestamps)]
     new_state = AgentState(messages=new_messages, topic=state["topic"])
+    
     # return {"messages": state["messages"] + [{"role": "ai", "content": str(response.timestamps)}]}
     return new_state
 
@@ -152,10 +155,7 @@ class GeneralKnowledgeResponse(BaseModel):
 
 def initial_chatbot_for_general_knowledge(state: AgentState) -> AgentState:
     print("Initial chatbot for general knowledge called")
-    for msg in reversed(state["messages"]):
-        if msg.type == "human":
-            last_message = msg.content
-            break
+    last_message = get_last_human_message(state)
     # last_message = state["messages"][-2].content
     print("The last message that will be answered is: " + str(last_message))
     llm = ChatCohere(
@@ -194,13 +194,11 @@ def initial_chatbot_for_general_knowledge(state: AgentState) -> AgentState:
 
 
 def get_weather_from_api(state: AgentState) -> AgentState:
-    for msg in reversed(state["messages"]):
-        if msg.type == "ai":
-            last_message = msg.content
-            break
+    last_message = get_last_ai_message(state)
     # last_message = state["messages"][-1].content
     # eval("[algo]") == [algo]
-    timestamps = eval(last_message)
+    # timestamps = eval(last_message)
+    timestamps = json.loads(last_message)
     print("The timestamps are: " + str(timestamps))
     weather_data = get_weather_for_timestamps(timestamps)
     print("The weather data is: " + str(weather_data))
@@ -215,10 +213,7 @@ class WeatherExplainerResponse(BaseModel):
 def weather_explainer_chatbot(state: AgentState) -> AgentState:
     print("Weather explainer chatbot called")
     # We need the lasts function weather data added to the messages
-    for msg in reversed(state["messages"]):
-        if msg.type == "system":
-            last_message = msg.content
-            break
+    last_message = get_last_system_message(state)
     # last_message = state["messages"][-1].content
     llm = ChatCohere(
         cohere_api_key=COHERE_KEY,
@@ -233,6 +228,7 @@ def weather_explainer_chatbot(state: AgentState) -> AgentState:
             """ 
             I need you to explain the weather data in a user friendly way.
             Please also make some planning recommendations
+            All in spanish
             {format_instructions}
             """,
             ),
@@ -307,10 +303,11 @@ def chatbot_with_context(state: AgentState) -> AgentState:
 def router_entry(state: AgentState) -> Literal["new_query", "followup"]:
     # If there is any previous AI message,
     # we consider this a followup, otherwise it's a new query
-    for msg in reversed(state["messages"]):
-        if msg.type == "ai":
-            return "followup"
-
+    # for msg in reversed(state["messages"]):
+    #     if msg.type == "ai":
+    #         return "followup"
+    if state["topic"] is not None:
+        return "followup"
     return "new_query"
 
 def weather_agent():
@@ -358,12 +355,38 @@ def weather_agent():
 #     weather_agent_connect(message)
 #     return
 
+def get_last_human_message(state: AgentState) -> Optional[str]:
+    for msg in reversed(state["messages"]):
+        if msg.type == "human":
+            return msg.content
+    return None
+
+def get_last_ai_message(state: AgentState) -> Optional[str]:
+    for msg in reversed(state["messages"]):
+        if msg.type == "ai":
+            return msg.content
+    return None
+
+def get_last_system_message(state: AgentState) -> Optional[str]:
+    for msg in reversed(state["messages"]):
+        if msg.type == "system":
+            return msg.content
+    return None
+
 def main():
     graph = weather_agent()
     state = AgentState(messages=[], topic=None)
 
     while True:
         message = input("You: ")
+
+        if message.lower() in ["exit", "quit"]:
+            print("Exiting the chatbot. Goodbye!")
+            break
+
+        if message.lower() in ["reset", "nuevo", "new"]:
+            state["topic"] = None
+            message = input("You (for new topic): ")
 
         # We add the user's message to the state
         state["messages"].append(HumanMessage(content=message))
@@ -372,11 +395,11 @@ def main():
         state = graph.invoke(state)
 
         # We find the last AI response
-        last_ai = None
-        for msg in reversed(state["messages"]):
-            if msg.type == "ai":
-                last_ai = msg.content
-                break
+        # last_ai = None
+        # for msg in reversed(state["messages"]):
+        #     if msg.type == "ai":
+        #         last_ai = msg.content
+        #         break
 
         # print("AI:", last_ai)
 
