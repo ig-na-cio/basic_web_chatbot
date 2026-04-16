@@ -1,0 +1,10 @@
+app/__pycache__/
+app/*/__pycache__/
+venv/
+*.db
+*.sqlite
+.env
+output.txt
+*.txt
+ai-agent/__pycache__/
+ai-agent/main.py
