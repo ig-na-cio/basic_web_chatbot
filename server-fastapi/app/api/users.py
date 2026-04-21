@@ -22,7 +22,7 @@ def get_db():
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.nombre == user.nombre).first()
     if existing_user:
-        raise HTTPException(status_code=400, detail="Usuario ya existe")
+        raise HTTPException(status_code=400, detail="User already exists")
 
     new_user = User(nombre=user.nombre)
     db.add(new_user)
@@ -42,7 +42,7 @@ def get_users(db: Session = Depends(get_db)):
 def get_user(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        raise HTTPException(status_code=404, detail="User not found")
     return user
 
 
@@ -51,10 +51,10 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
 def delete_user(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        raise HTTPException(status_code=404, detail="User not found")
     if user.nombre == "admin":
-        raise HTTPException(status_code=400, detail="No se puede eliminar el usuario admin")
-    
+        raise HTTPException(status_code=400, detail="Cannot delete the admin user")
+
     db.delete(user)
     db.commit()
-    return {"message": "Usuario eliminado"}
+    return {"message": "User deleted"}

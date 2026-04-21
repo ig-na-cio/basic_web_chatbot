@@ -10,7 +10,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, BaseMessage
 # from typing_extensions import TypedDict
-from weather_api_connect import get_weather_for_timestamps, WeatherData
+from ai_agent.weather_api_connect import get_weather_for_timestamps, WeatherData
 from datetime import datetime
 
 

@@ -6,5 +6,5 @@ venv/
 .env
 output.txt
 *.txt
-ai-agent/__pycache__/
-ai-agent/main.py
+ai_agent/__pycache__/
+ai_agent/main.py
