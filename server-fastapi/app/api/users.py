@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.user import User
-from app.schemas.user import UserCreate, UserResponse
+from app.schemas.user import UserCreate, UserResponse, UsersChatsResponse
 from app.core.database import SessionLocal
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -58,3 +58,23 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.delete(user)
     db.commit()
     return {"message": "User deleted"}
+
+
+# GET CHATS FROM USER
+@router.get("/{user_id}/chats", response_model=UsersChatsResponse)
+def get_user_chats(user_id: int, db: Session = Depends(get_db)):
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required")
+    id = db.query(User).filter_by(id=user_id).first()
+    if not id:
+        raise HTTPException(status_code=404, detail="User not found")
+
+
+    # We only want to return the ids of the chats
+    chat_ids = []
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    for chat in user.chats:
+        chat_ids.append(chat.id)
+    return UsersChatsResponse(chat_ids=chat_ids)

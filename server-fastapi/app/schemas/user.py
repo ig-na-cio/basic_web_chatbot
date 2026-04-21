@@ -12,3 +12,6 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class UsersChatsResponse(BaseModel):
+    chat_ids: list[int]

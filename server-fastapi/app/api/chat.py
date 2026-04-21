@@ -5,7 +5,7 @@ from ai_agent.weather_api_connect import WeatherData
 from app.models.chat import Chat
 from app.models.chatMessage import ChatMessage
 from app.models.user import User
-from app.schemas.chat import ChatRequest, ChatResponse, ChatHistoryResponse, CreateChatResponse
+from app.schemas.chat import ChatRequest, ChatResponse, ChatHistoryResponse, CreateChatResponse, MessageSchema
 from app.core.database import SessionLocal
 from ai_agent.weather_agent import weather_agent, AgentState
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -142,3 +142,26 @@ def delete_chat(user_id: int, chat_id: int, db: Session = Depends(get_db)):
     db.delete(chat)
     db.commit()
     return {"message": "Chat deleted"}
+
+
+# GET CHAT BY ID
+@router.get("/{chat_id}", response_model=ChatHistoryResponse)
+def get_chat_history(chat_id: int, user_id: int, db: Session = Depends(get_db)):
+    chat = db.query(Chat).filter_by(id=chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    if chat.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Chat does not belong to the user")
+
+
+    messages = [MessageSchema(role=msg.role, content=msg.content) for msg in chat.messages]
+
+    # But we have to erase the messages containing timestamps
+    # Those are of content: "[something]"
+    for msg in messages:
+        if msg.content.startswith("[") and msg.content.endswith("]"):
+            messages.remove(msg)
+
+    response = ChatHistoryResponse(messages=messages)
+
+    return response
