@@ -70,11 +70,13 @@ def get_user_chats(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
 
 
-    # We only want to return the ids of the chats
+    # We only want to return the ids of the chats and the titles
     chat_ids = []
+    chat_titles = []
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     for chat in user.chats:
         chat_ids.append(chat.id)
-    return UsersChatsResponse(chat_ids=chat_ids)
+        chat_titles.append(chat.title if chat.title else "Untitled Chat")
+    return UsersChatsResponse(chat_ids=chat_ids, titles=chat_titles)

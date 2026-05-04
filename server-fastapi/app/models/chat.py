@@ -11,6 +11,7 @@ class Chat(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     topic = Column(String, nullable=True)
     weather_data = Column(JSON, nullable=True)
+    title = Column(String, nullable=True)
     
     user = relationship("User", back_populates="chats")
     messages = relationship("ChatMessage", back_populates="chat")

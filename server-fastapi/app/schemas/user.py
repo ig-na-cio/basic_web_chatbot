@@ -15,3 +15,4 @@ class UserResponse(BaseModel):
 
 class UsersChatsResponse(BaseModel):
     chat_ids: list[int]
+    titles: list[str]

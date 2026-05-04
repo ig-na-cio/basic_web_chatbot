@@ -24,6 +24,7 @@ class AgentState(TypedDict):
     messages: List[BaseMessage]
     topic: Optional[str]
     weather_data: Optional[List[WeatherData]]
+    title: Optional[str]
 
 # This function will handle the first message from the user
 def first_message(state: AgentState) -> AgentState:
@@ -39,6 +40,7 @@ def first_message(state: AgentState) -> AgentState:
 
 class ClassifierResponse(BaseModel):
     topic: str
+    title: str
 
 # This function will classify the user's query as either "weather"
 # or "general knowledge"
@@ -60,6 +62,7 @@ def classify_query(state: AgentState) -> AgentState:
             - weather
             - general knowledge
             And answer only with topic : "weather" or "general knowledge".
+            Please also provide a title for the query, no more than 5 words.
             Wrap the output in this format and provide no other text:
             {format_instructions}
             """,
@@ -79,7 +82,8 @@ def classify_query(state: AgentState) -> AgentState:
 
     print("The query is classified as: " + response.topic)
     new_topic = response.topic
-    new_state = AgentState(messages=state["messages"], topic=new_topic)
+    new_title = response.title
+    new_state = AgentState(messages=state["messages"], topic=new_topic, title=new_title)
     return new_state
 
 def router(state: AgentState) -> Literal["weather", "general knowledge", "unknown topic"]:
@@ -147,7 +151,7 @@ def initial_chatbot_for_weather(state: AgentState) -> AgentState:
     timestamps = json.dumps(response.timestamps)
     print("The identified timestamps are: " + str(timestamps))
     new_messages = state["messages"] + [AIMessage(content=timestamps)]
-    new_state = AgentState(messages=new_messages, topic=state["topic"])
+    new_state = AgentState(messages=new_messages, topic=state["topic"], title=state["title"])
     
     # return {"messages": state["messages"] + [{"role": "ai", "content": str(response.timestamps)}]}
     return new_state
@@ -190,7 +194,7 @@ def initial_chatbot_for_general_knowledge(state: AgentState) -> AgentState:
     })
     print("The models explanation for the general knowledge question is: " + response.explanation)
     new_messages = state["messages"] + [AIMessage(content=response.explanation)]
-    new_state = AgentState(messages=new_messages, topic=state["topic"])
+    new_state = AgentState(messages=new_messages, topic=state["topic"], title=state["title"])
     return new_state
     # return {"messages": state["messages"] + [{"role": "ai", "content": response.explanation}]}
 
@@ -206,7 +210,7 @@ def get_weather_from_api(state: AgentState) -> AgentState:
     print("The weather data is: " + str(weather_data))
     # new_messages = state["messages"] + [SystemMessage(content=str(weather_data))]
     new_messages = state["messages"]
-    new_state = AgentState(messages=new_messages, topic=state["topic"], weather_data=weather_data)
+    new_state = AgentState(messages=new_messages, topic=state["topic"], weather_data=weather_data, title=state["title"])
     print(new_state)
     return new_state
     # return {"messages": state["messages"] + [{"role": "system", "content": str(weather_data)}]}
@@ -251,7 +255,7 @@ def weather_explainer_chatbot(state: AgentState) -> AgentState:
     })
     print("The models explanation for the weather is: " + response.explanation)
     new_messages = state["messages"] + [AIMessage(content=response.explanation)]
-    new_state = AgentState(messages=new_messages, topic=state["topic"], weather_data=state["weather_data"])
+    new_state = AgentState(messages=new_messages, topic=state["topic"], weather_data=state["weather_data"], title=state["title"])
     return new_state
     # return {"messages": state["messages"] + [{"role": "ai", "content": response.explanation}]}
 
@@ -303,7 +307,7 @@ def chatbot_with_context(state: AgentState) -> AgentState:
     })
 
     new_messages = state["messages"] + [AIMessage(content=response.answer)]
-    new_state = AgentState(messages=new_messages, topic=state["topic"], weather_data=state["weather_data"])
+    new_state = AgentState(messages=new_messages, topic=state["topic"], weather_data=state["weather_data"], title=state["title"])
     return new_state
     # return {
     #     "messages": state["messages"] + [
@@ -394,6 +398,7 @@ def main():
         if message.lower() in ["reset", "nuevo", "new"]:
             state["topic"] = None
             state["weather_data"] = None
+            state["title"] = None
             state["messages"] = []
             message = input("You (for new topic): ")
         

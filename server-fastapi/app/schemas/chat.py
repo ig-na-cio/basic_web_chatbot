@@ -7,6 +7,8 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+    topic: str
+    title: str
 
 class MessageSchema(BaseModel):
     role: str

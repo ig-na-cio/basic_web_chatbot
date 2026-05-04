@@ -41,7 +41,7 @@ def create_chat(user_id: int, db: Session = Depends(get_db)):
 def chat(req: ChatRequest, db: Session = Depends(get_db)):
 
     # IN ChatRequest: {user_id: int, chat_id: int, message: str}
-    # OUT ChatResponse: {response: str}
+    # OUT ChatResponse: {response: str, topic: str}
     
     if req.user_id is None:
         raise HTTPException(status_code=400, detail="user_id is required")
@@ -80,6 +80,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     messages.append(HumanMessage(content=req.message))
 
     topic = chat.topic
+    title = chat.title
 
     weather_data = None
     # With **wd, we match the keys of the dict
@@ -91,7 +92,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     state = AgentState(
         messages=messages,
         topic=topic,
-        weather_data=weather_data
+        weather_data=weather_data,
+        title=title
     )
 
     # We run the agent with the current state,
@@ -103,7 +105,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     chat.weather_data = [
         wd.model_dump() for wd in (new_state.get("weather_data") or [])
     ]
-
+    chat.title = new_state.get("title")
     # Last AI message for the response
     last_ai = next(
         msg.content for msg in reversed(new_state["messages"]) if msg.type == "ai"
@@ -122,7 +124,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         ))
     db.commit()
 
-    return {"response": last_ai}
+    return {"response": last_ai, "topic": new_state.get("topic"), "title": new_state.get("title")}
 
 
 @router.delete("/")
