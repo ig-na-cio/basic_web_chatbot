@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { loginUser } from "../api/user";
 
-function Login() {
+function Login({onLoginSuccess}) {
     const [name, setName] = useState("");
     const [userId, setUserId] = useState(null);
 
     const handleLogin = async () => {
         try {
-            const id = await loginUser(name);
-            setUserId(id);
+            const userData = await loginUser(name);
+            setUserId(userData.id);
         } catch (error) {
             console.error("Login failed:", error);
         }
@@ -20,19 +20,27 @@ function Login() {
             // sessionstorage or localStorage
             sessionStorage.setItem("userId", userId);
             sessionStorage.setItem("userName", name);
+            onLoginSuccess();
         }
     }, [userId, name]);
+
 
     return (
         <div>
             <h2>Login</h2>
-            <input
-                type="text"
-                placeholder="Enter your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-            />
-            <button onClick={handleLogin}>Login</button>
+
+            <form onSubmit={(e) => e.preventDefault()}>
+                <label>
+                    <input
+                        type="text"
+                        placeholder="Enter your name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                    />
+                </label>
+                <button onClick={handleLogin}>Login</button>
+            </form>
+            
         </div>
     );
 }
