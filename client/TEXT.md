@@ -29,4 +29,43 @@ o
 
 npm run dev
 
+# Tailwind
 
+nvm use 20
+
+npm install tailwindcss @tailwindcss/postcss postcss
+
+
+
+# TAILWIND FUNCIONANDO
+
+## Crear proyecto
+npm create vite@latest frontend
+cd frontend
+npm install
+
+## Instalar Tailwind v4
+npm install tailwindcss @tailwindcss/postcss postcss
+
+## Configurar PostCSS
+touch postcss.config.mjs
+
+con contenido
+
+export default {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+}
+
+editar src/index.css
+
+@import "tailwindcss";
+
+// src/main.jsx
+import "./index.css";
+
+## Correr todo
+
+nvm use 20
+npm run dev
