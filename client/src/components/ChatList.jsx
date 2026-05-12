@@ -29,11 +29,10 @@ function ChatList() {
     }, [userId]);
 
     return (
-        <div>
-            <h2>Your Chats</h2>
+        <div className="">
             <ul>
                 {chats.map((chatId, index) => (
-                    <li key={chatId}>
+                    <li key={chatId} className="h-9 justify-content border-2 border-amber-500 rounded p-2 bg-gray-600 mb-2 hover:bg-gray-400 transition-all duration-300 scale-90 hover:scale-100">
                         <a href={`/chatopen/${chatId}`}>{titles[index] || `Chat ${chatId}`}</a>
                     </li>
                 ))}

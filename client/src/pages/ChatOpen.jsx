@@ -17,8 +17,8 @@ function ChatOpenPage() {
     const chatId = useParams().chatId;
 
     return (
-        <div>
-            {userId ? <ChatOpen chatId={chatId} /> : <p><a href="/">Please log in.</a></p>}
+        <div className="bg-gray-700 min-h-screen flex flex-col items-center justify-center transition-all duration-400">
+            {userId ? <ChatOpen chatId={chatId} /> : <p className="text-amber-200"><a href="/">Please log in.</a></p>}
         </div>
     );
 }

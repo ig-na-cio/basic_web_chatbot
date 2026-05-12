@@ -29,7 +29,7 @@ function Login({onLoginSuccess}) {
         <div>
             <h2 className="text-3xl font-bold text-center text-amber-200 pb-4 animate-pulse hover:animate-spin cursor-pointer">☀️</h2>
             <form onSubmit={(e) => e.preventDefault()}>
-                <label className="block text-amber-200 mb-2 rounded p-2 hover:bg-gray-600 hover:scale-110 border-2 border-amber-500 transition-all duration-300 cursor-pointer">
+                <label className="block text-amber-200 mb-2 rounded p-2 hover:bg-gray-600 hover:scale-110 border-2 border-amber-500 transition-all duration-300 cursor-pointer outline-none focus:ring-2 focus:ring-amber-500 focus:ring-opacity-50">
                     <input
                         type="text"
                         placeholder="Enter your name"

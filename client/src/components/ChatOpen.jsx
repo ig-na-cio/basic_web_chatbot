@@ -23,6 +23,7 @@ function ChatOpen( {chatId} ) {
             const getChatHistory = async () => {
                 try {
                     const chatData = await getChatMessages(chatId, userId);
+                    console.log("Fetched chat history:", chatData);
                     setMessages(chatData.messages);
                     setTitle(chatData.title || `New Chat`);
                 } catch (error) {
@@ -57,29 +58,35 @@ function ChatOpen( {chatId} ) {
 
 
     return (
-        <div>
+        <div className="">
             <ul>
-                <button onClick={() => navigate("/chat")}>My chats</button>
+                <button className="block text-amber-200 mb-2 rounded p-2 hover:bg-gray-600 hover:scale-110 border-2 border-amber-500 transition-all duration-300 cursor-pointer outline-none focus:ring-2 focus:ring-amber-500 focus:ring-opacity-50"
+                onClick={() => navigate("/chat")}>Back to my chats</button>
             </ul>
-            <h2>{title}</h2>
-            {messages.length === 0 && <p>Ask me about the weather or general knowledge!</p>}
-            <ul>
+            {/* <h2 className="text-amber-200 text-xl underline mb-4">{title}</h2> */}
+            <div className="bg-gray-600 p-4 rounded w-150 h-65 mb-4 overflow-y-auto">
+            {messages.length === 0 && <p className="text-white"><strong>AI:</strong> Ask me about the weather or general knowledge!</p>}
+            <ul className="text-white">
                 {messages.map((message, index) => (
                     <li key={index}>
                         <strong>{message.role === "human" ? "You" : "AI"}:</strong> {message.content}
                     </li>
                 ))}
             </ul>
-            <form onSubmit={handleSendMessage}>
+            </div>
+            <form className="bg-gray-600 p-1 rounded w-146 h-10 flex items-center" 
+            onSubmit={handleSendMessage}>
                 <label>
-                    Enter a message:
-                    <input 
+                    <input className="justify-left w-130 h-8 p-2 rounded text-white"
+                    placeholder="Enter a message:" 
                     type="text" 
                     value={newMessage} 
                     onChange={(e) => setNewMessage(e.target.value)} 
                     />
                 </label>
-                <button type="submit">Submit</button>
+                <button 
+                className="justify-right w-30 text-amber-200 rounded p-1 hover:bg-gray-600 hover:scale-110 border-2 border-amber-500 transition-all duration-300 cursor-pointer outline-none focus:ring-2 focus:ring-amber-500 focus:ring-opacity-50"
+                type="submit">Submit</button>
             </form>
         </div>
     );
